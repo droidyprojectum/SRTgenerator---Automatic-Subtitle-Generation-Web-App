@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+    <title>SRTgenerator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') | safe }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Generate SRT</h1>
+        <form id="upload-form" enctype="multipart/form-data" action="/upload">
+            <label for="file" class="upload-box">
+                <span class="upload-box-text">Choose File</span>
+                <input type="file" name="file" id="file">
+            </label>
+            <div id="file-name"></div>
+            <div id="generate-btn" style="display: none;">
+                <span id="generate-btn-text">Generate</span>
+            </div>
+            <div class="loader">
+                <div class="loader-animation"></div>
+            </div>
+        </form>
+        <div id="file-warning" style="display: none; color: red; text-align: center; padding: 10px;"></div>
+
+        <div id="srt-container">
+            <pre id="srt-content"></pre>
+        </div>
+        <a id="download-srt" href="#" download="output.srt" style="display: none;">
+            <span id="download-srt-text">Download SRT</span>
+        </a>
+        
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $("#upload-form").submit(function (event) {
+            event.preventDefault();
+
+            // Check file size
+            var fileSize = $("#file")[0].files[0].size;
+            var maxSize = 500 * 1024 * 1024; // 50 MB (adjust as needed)
+
+            if (fileSize > maxSize) {
+                alert("File size exceeds the limit of 50 MB. Please choose a smaller file.");
+                return;
+            }
+
+            var formData = new FormData(this);
+            $.ajax({
+                url: $(this).attr('action'),
+                type: 'POST',
+                data: formData, 
+                contentType: false,
+                processData: false,
+                beforeSend: function () {
+                    $(".loader").show();
+                    $("#generate-btn").hide(); // Hide the generate button
+                    $("#file").prop("disabled", true); // Disable the file input
+                    $(".upload-box").off("click"); // Remove click event listener from the upload box
+                },
+                complete: function () {
+                    $(".loader").hide();
+                    $("#file").prop("disabled", false); // Enable the file input
+                    $(".upload-box").on("click", function () { // Add back the click event listener to the upload box
+                        $("#file").click();
+                    });
+                },
+                success: function (data) {
+                    var srtContent = data.srt_content.replace(/(?:\r\n|\r|\n)/g, '\r\n');
+                    $("#srt-content").text(srtContent);
+                    $("#download-srt").attr('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(srtContent));
+                    $("#download-srt").show();
+                    $("#generate-btn").show(); // Show the generate button
+                    $("#file").val(""); // Clear the file input value
+                },
+                error: function () {
+                    alert("An error occurred. Please try again.");
+                    $("#generate-btn").show(); // Show the generate button
+                }
+            });
+        });
+
+        // Add an event listener to the file input
+        $("#file").change(function () {
+            if ($(this).val() !== "") {
+                var fileName = $(this).val().split('\\').pop();
+                $("#file-name").text(fileName);
+                $("#generate-btn").show();
+
+                var allowedExtensions = ['mp4', 'wav', 'mp3'];
+                var fileExtension = fileName.split('.').pop().toLowerCase();
+                if (!allowedExtensions.includes(fileExtension)) {
+                    $("#file-warning").text("Unsupported file type. Please choose an MP4, WAV, or MP3 file.");
+                    $("#file-warning").show();
+                    $("#generate-btn").hide();
+                } else {
+                    $("#file-warning").hide();
+                }
+            }
+        });
+
+        $("#generate-btn").click(function () {
+            $("#upload-form").submit();
+            $("#generate-btn").hide();
+        });
+
+        // Add a warning message when the user tries to reload or close the page
+        window.addEventListener("beforeunload", function (event) {
+            event.preventDefault();
+            event.returnValue = ""; // Some browsers require a non-empty string for the dialog to appear
+            alert("Warning: Reloading or closing the page may cause loss of generated information.");
+        });
+    </script>
+</body>
+</html>
